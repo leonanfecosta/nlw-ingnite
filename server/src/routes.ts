@@ -18,11 +18,11 @@ export async function appRoutes(app: FastifyInstance) {
         title,
         created_at: today,
         weekDays: {
-          create: weekDays.map(weekDay => {
+          create: weekDays.map((weekDay) => {
             return {
               week_day: weekDay,
             };
-          })
+          }),
         },
       },
     });
@@ -58,12 +58,12 @@ export async function appRoutes(app: FastifyInstance) {
       },
     });
 
-    const completedHabits = day?.dayHabits.map(dayHabit => dayHabit.habit_id);
+    const completedHabits = day?.dayHabits.map((dayHabit) => dayHabit.habit_id);
 
     return {
       possibleHabits,
       completedHabits,
-    }
+    };
   });
 
   app.patch("/habits/:id/toggle", async (request) => {
@@ -114,12 +114,30 @@ export async function appRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get("/summary", async (request) => {
+  app.get("/summary", async () => {
     const summary = await prisma.$queryRaw`
-    SELECT 
-      D.id,
-      D.date
-    FROM days D
-        `
+      SELECT 
+        D.id, 
+        D.date,
+        (
+          SELECT 
+            cast(count(*) as float)
+          FROM day_habits DH
+          WHERE DH.day_id = D.id
+        ) as completed,
+        (
+          SELECT
+            cast(count(*) as float)
+          FROM habit_week_days HDW
+          JOIN habits H
+            ON H.id = HDW.habit_id
+          WHERE
+            HDW.week_day = cast(strftime('%w', D.date/1000.0, 'unixepoch') as int)
+            AND H.created_at <= D.date
+        ) as amount
+      FROM days D
+    `;
+
+    return summary;
   });
 }
